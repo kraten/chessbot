@@ -22,7 +22,10 @@ Python chess bot that plays chess online on websites like chess.com using Stockf
 <li>Python 2:<br>
 <code>python2 chessbot-py2.py</code>
   </li>
-  </ul>
+  </ul><br>
+ <p>Note: Before running ChessBot, enable the premove and auto-queen option in chess.com settings. If ChessBot is running slow on your computer, lower the number of threads for stockfish engine.</p> 
 <br>
 <h3>Disclaimer</h3><b>
-<p>The code for this project is written with goodwill and not to harm anyone. This is purely for educational purposes. I am not responsible or take liabilty for the consequences of anyone using the code. Using chessbot can get you banned, so use it on your own risk. </b></p>
+<p>The code for this project is written with goodwill and not to harm anyone. This is purely for educational purposes. I am not responsible or take liability for the consequences of anyone using this code.</p<br></b>
+  
+<p><b>CAUTION:  Use it on your own risk, as using ChessBot could get you banned.</b></p>
