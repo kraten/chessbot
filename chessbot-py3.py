@@ -8,7 +8,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
 
+play_bongcloud = False
 
 def load_page():
     driver = webdriver.Firefox()
@@ -34,23 +36,23 @@ def start_play(driver):
     print(driver.current_url)
 
     try:
-        myElem = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'game-over-dialog')))
-        elem = driver.find_element(By.CLASS_NAME, 'game-over-dialog')
-        elem = elem.find_element_by_class_name('icon-x')
+        myElem = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'upgrade-modal')))
+        elem = driver.find_element(By.CLASS_NAME, 'upgrade-modal')
+        elem = elem.find_element_by_xpath('/html/body/div[1]/div[4]/div/div[2]/div[2]/span')
         elem.click()
         elem = driver.find_element(By.CLASS_NAME, 'tab-nav-challenge')
         elem.click()
     except TimeoutException:
-        print("Unable to close Popup!")
+        pass
 
-    try:
-        myElem = WebDriverWait(driver, 3).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, ".quick-challenge > div:nth-child(3) > button:nth-child(1)")))
-        print("Game Started!")
-    except TimeoutException:
-        print("Loading took too much time!")
+    # try:
+    #     myElem = WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+    #         (By.CSS_SELECTOR, ".quick-challenge > div:nth-child(3) > button:nth-child(1)")))
+    #     print("Game Started!")
+    # except TimeoutException:
+    #     print("Loading took too much time!")
 
-    button = driver.find_element(By.CSS_SELECTOR, ".quick-challenge > div:nth-child(3) > button:nth-child(1)")
+    button = driver.find_element(By.CSS_SELECTOR, ".form-button-component")
     button.click()
 
     return
@@ -60,13 +62,16 @@ def get_user_color(driver, username):
     while (1):
         try:
             myElem = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.CLASS_NAME, 'notification-game-new-game-playing')))
-            print("User Color Detected!")
+                EC.presence_of_element_located((By.CLASS_NAME, 'game-buttons-playing')))
             break
         except TimeoutException:
             print("Searching for Opponent!")
 
-    elem = driver.find_element(By.CLASS_NAME, "notification-game-new-game-playing")
+    elem_list = driver.find_elements_by_class_name("chat-message-component")
+    elem = elem_list[-1]
+
+    # elem = driver.find_element(By.CLASS_NAME, "notification-game-new-game-playing")
+
     print(elem.text)
     players = re.findall(r'(\w+)\s\(\d+\)', elem.text)
 
@@ -82,30 +87,22 @@ def get_user_color(driver, username):
 
 
 def pgn_generator(driver, move_number, pgn, user_color):
-    move_id = "movelist_" + str(move_number)
-    move_notation = ""
-    print(move_id)
+    last_move = ''
+
     while (1):
         try:
-            myElem = WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.ID, move_id)))
-            print("Move Made!")
-            break
+            elements = driver.find_elements_by_class_name('move-text-component')
+            if(len(elements) >= move_number):
+                last_move = elements[move_number-1].text.strip()
+                break
         except TimeoutException:
             print("Opponent is thinking!")
-    while move_notation == "":
-        move_notation = driver.find_element_by_id(move_id).find_element_by_class_name('gotomove').text
-    print(move_notation)
-
-    driver.execute_script("""
-         document.getElementById("highlight1").remove();
-         document.getElementById("highlight2").remove();
-    """)
 
     if move_number % 2 == 1:
-        pgn += str(move_number // 2 + 1) + "." + move_notation + " "
+        pgn += str(move_number // 2 + 1) + "." + last_move + " "
     else:
-        pgn += move_notation + " "
-    return pgn, move_notation
+        pgn += last_move + " "
+    return pgn, last_move
 
 
 def get_best_move(chessEngine):
@@ -121,18 +118,15 @@ def get_best_move(chessEngine):
     chessEngine.setposition(board.fen())
 
     move = chessEngine.bestmove()
-    print(move['bestmove'])
-
     bestmove = move['bestmove']
+
     return bestmove
 
 
 def highlight_move(driver, user_color, best_move):
     driver.execute_script("""
-        element = document.getElementsByClassName('chessboard')[0];
-        x = element.style.width.replace(/\D/g,'') / 8;
-
-        chessboard_id = document.getElementsByClassName('chessboard')[0].id + '_boardarea';
+        chessboard = document.getElementById('game-board');
+        x = chessboard.style.width.replace(/\D/g,'') / 8;
 
         if(arguments[4].localeCompare("white") == 0){
             var from_position_coordinate = [(arguments[0].charCodeAt(0) - 97) * x, (8 - parseInt(arguments[1])) * x];
@@ -143,36 +137,32 @@ def highlight_move(driver, user_color, best_move):
             var to_position_coordinate = [(7 - (arguments[2].charCodeAt(0) - 97)) * x, (parseInt(arguments[3]) - 1) * x];
         }
 
-
-        var pos_old = "position: absolute; z-index: 2; pointer-events: none; opacity: 0.9; background-color: rgb(244, 42, 50); width:" + x + "px; height: " + x + "px; transform: translate(" + from_position_coordinate[0] + "px," +  from_position_coordinate[1] + "px);";
-        var pos_new = "position: absolute; z-index: 2; pointer-events: none; opacity: 0.9; background-color: rgb(244, 42, 50); width:" + x + "px; height: " + x + "px; transform: translate(" + to_position_coordinate[0] + "px," +  to_position_coordinate[1] + "px);";
-
+        highlight1_pos = arguments[0].charCodeAt() - 'a'.charCodeAt() + 1 
+        highlight1_class = '0' + highlight1_pos + '0' + arguments[1];
         element = document.createElement('div');            
-        element.setAttribute("id", "highlight1");    
-        element.setAttribute("style", pos_old);    
-        document.getElementById(chessboard_id).appendChild(element);
+        element.setAttribute("id", "highlight1");
+        element.setAttribute("class", "square square-" + highlight1_class + " marked-square");        
+        element.setAttribute("style", "background-color: rgb(244, 42, 50); opacity: 0.9");    
+        chessboard.appendChild(element);
 
+        highlight2_pos = arguments[2].charCodeAt() - 'a'.charCodeAt() + 1
+        highlight2_class = '0' + highlight2_pos + '0' + arguments[3];
         element = document.createElement('div');
         element.setAttribute("id", "highlight2");            
-        element.setAttribute("style", pos_new); 
-        document.getElementById(chessboard_id).appendChild(element);
+        element.setAttribute("class", "square square-" + highlight2_class + " marked-square");        
+
+        element.setAttribute("style", "background-color: rgb(244, 42, 50); opacity: 0.9");    
+        chessboard.appendChild(element);
        """, best_move[0], best_move[1], best_move[2], best_move[3], user_color)
     return
 
 
 def auto_move(driver):
     element = driver.find_element(By.XPATH, '//*[@id="highlight1"]')
-    element.click()
-    # ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform();
-
+    ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform();
+    time.sleep(0.05)
     element = driver.find_element(By.XPATH, '//*[@id="highlight2"]')
-    element.click()
-    # ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform();
-
-    # driver.execute_script("""
-    #     document.getElementById('highlight1').click();
-    #     document.getElementById('highlight2').click();
-    # """)
+    ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform();
     return
 
 
@@ -181,51 +171,58 @@ def play_game(driver, user_color, chessEngine):
     # Clear pgn.pgn file before use
     open('pgn.pgn', 'w').close()
 
-    highlight_move(driver, user_color, "e2e4")
-    auto_move(driver)
+    if user_color == 'white':
+        highlight_move(driver, user_color, 'e2e4')
+        auto_move(driver)
 
     for move_number in range(1, 500):
         pgn, move_notation = pgn_generator(driver, move_number, pgn, user_color)
 
-        print(pgn)
-
         with open("pgn.pgn", "w") as text_file:
             text_file.write("%s" % pgn)
 
+        game_ended = game_end(driver)
+
+        if game_ended or move_notation[-1] == '#':
+            print(pgn)
+            print('Game finished!')
+            return
+
         best_move = get_best_move(chessEngine)
 
-        highlight_move(driver, user_color, best_move)
+        if play_bongcloud:
+            if user_color == 'white' and move_number == 2:
+                best_move = 'e1e2'
+            if user_color == 'black':
+                if move_number == 1:
+                    best_move = 'e7e5'
+                if move_number == 3:
+                    best_move = 'e8e7'
 
-        auto_move(driver)
+        try_count = 0
+        while try_count < 3:
+            try:
+                if((user_color == 'white' and move_number % 2 == 0) or (user_color == 'black' and move_number % 2 == 1)):
+                    highlight_move(driver, user_color, best_move)
+                    auto_move(driver)
+                break
+            except:
+                print('Failed to highlight square')
 
-        if game_end(user_color, move_notation) == 1:
-            return
+            try_count = try_count + 1
+            time.sleep(0.5)
     return
 
 
-def game_end(user_color, move_notation):
-    if user_color == 'white':
-        if move_notation == '1-0':
-            print('User Won!')
-            return 1
-        elif move_notation == '0-1':
-            print('User Lost!')
-            return 1
-        elif move_notation == '1-1':
-            print('Game drawn!')
-            return 1
-    else:
-        if move_notation == '0-1':
-            print('User Won!')
-            return 1
-        elif move_notation == '1-0':
-            print('User Lost!')
-            return 1
-        elif move_notation == '1-1':
-            print('Game drawn!')
-            return 1
+def game_end(driver):
+    game_finished_message = 0
 
-    return 0
+    elements = driver.find_elements_by_class_name('chat-message-component')
+    for element in elements:
+        if element.get_attribute('data-notification') == 'gameOverPlay':
+            game_finished_message = 1
+
+    return game_finished_message
 
 
 def new_game(driver, username, chessEngine):
@@ -238,22 +235,25 @@ def new_game(driver, username, chessEngine):
 def main():
     driver = load_page()
 
-    chessEngine = Engine('./stockfish_8_x64', param={'Threads': 5, 'Ponder': None})
+    chessEngine = Engine('./stockfish_8_x64', param={'Threads': 10, 'Ponder': None})
 
     username = ''
     password = ''
+
+    global play_bongcloud
+    play_bongcloud = True
 
     login(driver, username, password)
     time.sleep(3)
 
     while (1):
         new_game(driver, username, chessEngine)
-
-        print("Play Again? (y/n)")
-        play_again = input()
-
-        if (play_again != 'y'):
-            break
+        time.sleep(3)
+        # print("Play Again? (y/n)")
+        # play_again = input()
+        #
+        # if (play_again != 'y'):
+        #     break
 
     driver.close()
 
