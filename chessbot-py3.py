@@ -1,7 +1,7 @@
 import re
 import time
 import chess.pgn
-from stockfishpy import *
+from stockfishpy import Engine
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -10,7 +10,12 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 
+# Configure these values before starting the program
+username = ''
+password = ''
 play_bongcloud = False
+auto_play = False
+auto_start_new_game = False
 
 def load_page():
     driver = webdriver.Firefox()
@@ -18,7 +23,8 @@ def load_page():
     return driver
 
 
-def login(driver, username, password):
+def login(driver):
+    global username, password
     elem = driver.find_element_by_id('username')
     elem.clear()
     elem.send_keys(username)
@@ -36,7 +42,7 @@ def start_play(driver):
     print(driver.current_url)
 
     try:
-        myElem = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'upgrade-modal')))
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'upgrade-modal')))
         elem = driver.find_element(By.CLASS_NAME, 'upgrade-modal')
         elem = elem.find_element_by_xpath('/html/body/div[1]/div[4]/div/div[2]/div[2]/span')
         elem.click()
@@ -45,38 +51,35 @@ def start_play(driver):
     except TimeoutException:
         pass
 
-    # try:
-    #     myElem = WebDriverWait(driver, 3).until(EC.presence_of_element_located(
-    #         (By.CSS_SELECTOR, ".quick-challenge > div:nth-child(3) > button:nth-child(1)")))
-    #     print("Game Started!")
-    # except TimeoutException:
-    #     print("Loading took too much time!")
-
     button = driver.find_element(By.CSS_SELECTOR, ".form-button-component")
     button.click()
 
     return
 
 
-def get_user_color(driver, username):
+def get_user_color(driver):
     while (1):
         try:
             myElem = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.CLASS_NAME, 'game-buttons-playing')))
+                EC.presence_of_element_located((By.CLASS_NAME, 'draw-button-component')))
             break
         except TimeoutException:
-            print("Searching for Opponent!")
+            print("Waiting for user to start the game..")
 
     elem_list = driver.find_elements_by_class_name("chat-message-component")
-    elem = elem_list[-1]
 
-    # elem = driver.find_element(By.CLASS_NAME, "notification-game-new-game-playing")
+    if('warn-message-component' in elem_list[-1].get_attribute('class')):
+        elem = elem_list[-2]
+    else:
+        elem = elem_list[-1]
 
     print(elem.text)
+    
     players = re.findall(r'(\w+)\s\(\d+\)', elem.text)
 
     white_player = players[0]
-    black_player = players[1]
+
+    global username
 
     if white_player == username:
         print(username + ' is white')
@@ -159,21 +162,31 @@ def highlight_move(driver, user_color, best_move):
 
 def auto_move(driver):
     element = driver.find_element(By.XPATH, '//*[@id="highlight1"]')
-    ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform();
+    ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform()
     time.sleep(0.05)
     element = driver.find_element(By.XPATH, '//*[@id="highlight2"]')
-    ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform();
+    ActionChains(driver).move_to_element_with_offset(element, 0, 2).click().perform()
     return
 
 
 def play_game(driver, user_color, chessEngine):
+    global auto_play
+
     pgn = ""
     # Clear pgn.pgn file before use
     open('pgn.pgn', 'w').close()
 
+    gameOverMessageCount = 0
+    elements = driver.find_elements_by_class_name('chat-message-component')
+    for element in elements:
+        if element.get_attribute('data-notification') == 'gameOver':
+            gameOverMessageCount += 1 
+
+
     if user_color == 'white':
         highlight_move(driver, user_color, 'e2e4')
-        auto_move(driver)
+        if auto_play:
+            auto_move(driver)
 
     for move_number in range(1, 500):
         pgn, move_notation = pgn_generator(driver, move_number, pgn, user_color)
@@ -181,7 +194,7 @@ def play_game(driver, user_color, chessEngine):
         with open("pgn.pgn", "w") as text_file:
             text_file.write("%s" % pgn)
 
-        game_ended = game_end(driver)
+        game_ended = game_end(driver, gameOverMessageCount)
 
         if game_ended or move_notation[-1] == '#':
             print(pgn)
@@ -204,7 +217,8 @@ def play_game(driver, user_color, chessEngine):
             try:
                 if((user_color == 'white' and move_number % 2 == 0) or (user_color == 'black' and move_number % 2 == 1)):
                     highlight_move(driver, user_color, best_move)
-                    auto_move(driver)
+                    if auto_play:
+                        auto_move(driver)
                 break
             except:
                 print('Failed to highlight square')
@@ -214,46 +228,43 @@ def play_game(driver, user_color, chessEngine):
     return
 
 
-def game_end(driver):
+def game_end(driver, gameOverMessageCount):
     game_finished_message = 0
+
+    gameOverMessageCountNew = 0
 
     elements = driver.find_elements_by_class_name('chat-message-component')
     for element in elements:
-        if element.get_attribute('data-notification') == 'gameOverPlay':
-            game_finished_message = 1
-
+        if element.get_attribute('data-notification') == 'gameOver':
+            gameOverMessageCountNew += 1
+            
+    if gameOverMessageCountNew > gameOverMessageCount:
+        game_finished_message = 1
+        
     return game_finished_message
 
 
-def new_game(driver, username, chessEngine):
-    start_play(driver)
-    user_color = get_user_color(driver, username)
+def new_game(driver, chessEngine):
+    global auto_start_new_game
+
+    if(auto_start_new_game):
+        start_play(driver)
+
+    user_color = get_user_color(driver)
     play_game(driver, user_color, chessEngine)
     return
 
 
 def main():
     driver = load_page()
-
     chessEngine = Engine('./stockfish_8_x64', param={'Threads': 10, 'Ponder': None})
 
-    username = ''
-    password = ''
-
-    global play_bongcloud
-    play_bongcloud = True
-
-    login(driver, username, password)
+    login(driver)
     time.sleep(3)
 
     while (1):
-        new_game(driver, username, chessEngine)
+        new_game(driver, chessEngine)
         time.sleep(3)
-        # print("Play Again? (y/n)")
-        # play_again = input()
-        #
-        # if (play_again != 'y'):
-        #     break
 
     driver.close()
 
