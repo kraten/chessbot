@@ -1,12 +1,12 @@
 # ChessBot
-Python chess bot that plays chess online on websites like chess.com using Stockfish Engine
+Python chess bot that plays chess online on chess.com using Stockfish Engine
 <ul>
-<li>Compatible with Python 3 and Python 2
+<li>Compatible with Python 3
 </ul><br>
 
 <h2>Getting Started</h2>
 
-1. Install python
+1. Install python3
 
 2. Install python dependencies:
 <code>pip install -r requirements.txt</code>
@@ -17,11 +17,8 @@ Python chess bot that plays chess online on websites like chess.com using Stockf
 
 <ul>
 <li>Python 3:<br>
-<code>python2 chessbot-py3.py</code>
+<code>python3 chessbot.py</code>
   </li><br>
-<li>Python 2:<br>
-<code>python2 chessbot-py2.py</code>
-  </li>
   </ul><br>
  <p>Note: Before running ChessBot, enable the premove and auto-queen option in chess.com settings. If ChessBot is running slow on your computer, lower the number of threads for stockfish engine.</p> 
 <br>
