@@ -246,7 +246,7 @@ def new_game(driver, chessEngine):
 
 def main():
     driver = load_page()
-    chessEngine = Engine('./stockfish_8_x64', param={'Threads': 10, 'Ponder': None})
+    chessEngine = Engine('./stockfish_13_linux_x64', param={'Threads': 10, 'Ponder': None})
 
     login(driver)
     time.sleep(3)
