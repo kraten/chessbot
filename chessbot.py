@@ -129,16 +129,6 @@ def get_best_move(chessEngine):
 def highlight_move(driver, user_color, best_move):
     driver.execute_script("""
         chessboard = document.getElementById('game-board');
-        x = chessboard.style.width.replace(/\D/g,'') / 8;
-
-        if(arguments[4].localeCompare("white") == 0){
-            var from_position_coordinate = [(arguments[0].charCodeAt(0) - 97) * x, (8 - parseInt(arguments[1])) * x];
-            var to_position_coordinate = [(arguments[2].charCodeAt(0) - 97) * x, (8 - parseInt(arguments[3])) * x];
-        }
-        else{
-            var from_position_coordinate = [(7 - (arguments[0].charCodeAt(0) - 97)) * x, (parseInt(arguments[1]) - 1) * x];
-            var to_position_coordinate = [(7 - (arguments[2].charCodeAt(0) - 97)) * x, (parseInt(arguments[3]) - 1) * x];
-        }
 
         highlight1_pos = arguments[0].charCodeAt() - 'a'.charCodeAt() + 1 
         highlight1_class = '0' + highlight1_pos + '0' + arguments[1];
@@ -153,7 +143,6 @@ def highlight_move(driver, user_color, best_move):
         element = document.createElement('div');
         element.setAttribute("id", "highlight2");            
         element.setAttribute("class", "square square-" + highlight2_class + " marked-square");        
-
         element.setAttribute("style", "background-color: rgb(244, 42, 50); opacity: 0.9");    
         chessboard.appendChild(element);
        """, best_move[0], best_move[1], best_move[2], best_move[3], user_color)
